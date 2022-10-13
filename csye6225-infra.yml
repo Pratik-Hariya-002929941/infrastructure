@@ -1,0 +1,201 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Create a VPC with 3 subnets, Internet Gateway, and route table.
+
+# Paramters to setup the infrastructure
+Parameters:
+  VirtualPrivateCloud:
+    Default: "20.0.0.0/16"
+    Type: String
+    Description: VPC IP Address Range
+  PublicSubnet1:
+    Default: "20.0.1.0/24"
+    Type: String
+    Description: Public Subnet-1 IP Address Range 
+  PublicSubnet2:
+    Default: "20.0.2.0/24"
+    Type: String
+    Description: Public Subnet-2 IP Address Range 
+  PublicSubnet3:
+    Default: "20.0.3.0/24"
+    Type: String
+    Description: Public Subnet-3 IP Address Range 
+  # PrivateSubnet1:
+  #   Default: "20.0.4.0/24"
+  #   Type: String
+  #   Description: Private Subnet-1 IP Address Range 
+  # PrivateSubnet2:
+  #   Default: "20.0.5.0/24"
+  #   Type: String
+  #   Description: Private Subnet-2 IP Address Range 
+  # PrivateSubnet3:
+  #   Default: "20.0.6.0/24"
+  #   Type: String
+  #   Description: Private Subnet-3 IP Address Range 
+
+Resources:
+# Creating Virtual Private Cloud
+  VPC6225:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VirtualPrivateCloud
+      EnableDnsSupport: "true"
+      EnableDnsHostnames: "true"
+      InstanceTenancy: "default"
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-VPC
+        
+  #Creating Internet Gateway
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: InternetGatewayForVPC
+
+  #Attaching InternetGateway with VPC6225
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC6225
+
+  #Creating Public Route Table:
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: Public Route Table
+      VpcId: !Ref VPC6225
+
+  #Creating Private Route Table:
+  # PrivateRouteTable:
+  #   Type: AWS::EC2::RouteTable
+  #   Properties:
+  #     Tags:
+  #       - Key: Name
+  #         Value: Private Route Table
+  #     VpcId: !Ref VPC6225
+
+  #Creating public route for public route table with destination CIDR block 0.0.0.0/0 and Above created InternetGateway as target:
+  PublicRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref PublicRouteTable
+
+  #Creating Public Subnet-1:
+  publicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC6225
+      CidrBlock: !Ref PublicSubnet1
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-PublicSubnet1 
+
+  #Public Subnet 1 attached to Public Route Table:
+  RouteTablePublicSubnet1Association:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref publicSubnet1
+
+ #Creating Public Subnet-2:
+  publicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC6225
+      CidrBlock: !Ref PublicSubnet2
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-PublicSubnet2
+
+  #Public Subnet 2 attached to Public Route Table:
+  RouteTablePublicSubnet2Association:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref publicSubnet2
+
+  #Creating Public Subnet-3:
+  publicSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC6225
+      CidrBlock: !Ref PublicSubnet3
+      AvailabilityZone: !Select [2, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-PublicSubnet3
+
+  #Public Subnet 3 attached to Public Route Table:
+  RouteTablePublicSubnet3Association:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref publicSubnet3
+
+  #Creating Private Subnet-1:
+  # privateSubnet1:
+  #   Type: AWS::EC2::Subnet
+  #   Properties:
+  #     VpcId: !Ref VPC6225
+  #     CidrBlock: !Ref PrivateSubnet1
+  #     AvailabilityZone: !Select [0, !GetAZs ""]
+  #     MapPublicIpOnLaunch: false
+  #     Tags:
+  #       - Key: Name
+  #         Value: !Sub ${AWS::StackName}-PrivateSubnet1
+
+  # #Private Subnet 1 attached to Private Route Table:
+  # PrivateSubnet1RouteTableAssociation:
+  #   Type: AWS::EC2::SubnetRouteTableAssociation
+  #   Properties:
+  #     RouteTableId: !Ref PrivateRouteTable
+  #     SubnetId: !Ref privateSubnet1
+
+  # #Creating Private Subnet-2:
+  # privateSubnet2:
+  #   Type: AWS::EC2::Subnet
+  #   Properties:
+  #     VpcId: !Ref VPC6225
+  #     CidrBlock: !Ref PrivateSubnet2
+  #     AvailabilityZone: !Select [1, !GetAZs ""]
+  #     MapPublicIpOnLaunch: false
+  #     Tags:
+  #       - Key: Name
+  #         Value: !Sub ${AWS::StackName}-PrivateSubnet2
+
+  # #Private Subnet 2 attached to Private Route Table:
+  # PrivateSubnet2RouteTableAssociation:
+  #   Type: AWS::EC2::SubnetRouteTableAssociation
+  #   Properties:
+  #     RouteTableId: !Ref PrivateRouteTable
+  #     SubnetId: !Ref privateSubnet2
+
+  # #Creating Private Subnet-3:
+  # privateSubnet3:
+  #   Type: AWS::EC2::Subnet
+  #   Properties:
+  #     VpcId: !Ref VPC6225
+  #     CidrBlock: !Ref PrivateSubnet3
+  #     AvailabilityZone: !Select [2, !GetAZs ""]
+  #     MapPublicIpOnLaunch: false
+  #     Tags:
+  #       - Key: Name
+  #         Value: !Sub ${AWS::StackName}-PrivateSubnet3
+
+  # #Private Subnet 3 attached to Private Route Table:
+  # PrivateSubnet3RouteTableAssociation:
+  #   Type: AWS::EC2::SubnetRouteTableAssociation
+  #   Properties:
+  #     RouteTableId: !Ref PrivateRouteTable
+  #     SubnetId: !Ref privateSubnet3
