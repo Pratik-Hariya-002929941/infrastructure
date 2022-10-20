@@ -1,39 +1,43 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: Create a VPC with 3 subnets, Internet Gateway, and route table.
 
-# Paramters to setup the infrastructure
+# Paramters to take the values on runtime
 Parameters:
   VirtualPrivateCloud:
-    Default: "20.0.0.0/16"
+    Default: "10.0.0.0/16"
     Type: String
-    Description: VPC IP Address Range
+    Description: Please Enter the IP Address Range for vpc
   PublicSubnet1:
-    Default: "20.0.1.0/24"
+    Default: "10.0.1.0/24"
     Type: String
-    Description: Public Subnet-1 IP Address Range 
+    Description: Please Enter the IP Address Range for Public Subnet-1
   PublicSubnet2:
-    Default: "20.0.2.0/24"
+    Default: "10.0.2.0/24"
     Type: String
-    Description: Public Subnet-2 IP Address Range 
+    Description: Please Enter the IP Address Range for Public Subnet-2
   PublicSubnet3:
-    Default: "20.0.3.0/24"
+    Default: "10.0.3.0/24"
     Type: String
-    Description: Public Subnet-3 IP Address Range 
-  # PrivateSubnet1:
-  #   Default: "20.0.4.0/24"
+    Description: Please Enter the IP Address Range for Public Subnet-3
+  ImageValue:
+    Default: ""
+    Type: String
+    Description: Please Enter the image id
+  # PrivateSubnet1CIDR:
+  #   Default: "10.0.4.0/24"
   #   Type: String
-  #   Description: Private Subnet-1 IP Address Range 
-  # PrivateSubnet2:
-  #   Default: "20.0.5.0/24"
+  #   Description: Please Enter the IP Address Range for Private Subnet-1
+  # PrivateSubnet2CIDR:
+  #   Default: "10.0.5.0/24"
   #   Type: String
-  #   Description: Private Subnet-2 IP Address Range 
-  # PrivateSubnet3:
-  #   Default: "20.0.6.0/24"
+  #   Description: Please Enter the IP Address Range for Private Subnet-2
+  # PrivateSubnet3CIDR:
+  #   Default: "10.0.6.0/24"
   #   Type: String
-  #   Description: Private Subnet-3 IP Address Range 
+  #   Description: Please Enter the IP Address Range for Private Subnet-3
 
 Resources:
-# Creating Virtual Private Cloud
+  # Creating VPC
   VPC6225:
     Type: AWS::EC2::VPC
     Properties:
@@ -44,32 +48,32 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub ${AWS::StackName}-VPC
-        
-  #Creating Internet Gateway
+
+  #creating IGW
   InternetGateway:
     Type: AWS::EC2::InternetGateway
     Properties:
       Tags:
         - Key: Name
-          Value: InternetGatewayForVPC
+          Value: !Sub ${AWS::StackName}-VPC-InternetGateway
 
-  #Attaching InternetGateway with VPC6225
+  #Attaching IGW(InternetGateway) with VPC6225
   InternetGatewayAttachment:
     Type: AWS::EC2::VPCGatewayAttachment
     Properties:
       InternetGatewayId: !Ref InternetGateway
       VpcId: !Ref VPC6225
 
-  #Creating Public Route Table:
+  #creating A Public Route Table:
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
       Tags:
         - Key: Name
-          Value: Public Route Table
+          Value: !Sub ${AWS::StackName}-PublicRouteTable
       VpcId: !Ref VPC6225
 
-  #Creating Private Route Table:
+  #creating A Private Route Table:
   # PrivateRouteTable:
   #   Type: AWS::EC2::RouteTable
   #   Properties:
@@ -78,7 +82,7 @@ Resources:
   #         Value: Private Route Table
   #     VpcId: !Ref VPC6225
 
-  #Creating public route for public route table with destination CIDR block 0.0.0.0/0 and Above created InternetGateway as target:
+  #creating a public route for public route table with destination CIDR block 0.0.0.0/0 and Above created IGW as target:
   PublicRoute:
     Type: AWS::EC2::Route
     Properties:
@@ -86,7 +90,7 @@ Resources:
       GatewayId: !Ref InternetGateway
       RouteTableId: !Ref PublicRouteTable
 
-  #Creating Public Subnet-1:
+  #creating Public Subnet-1:
   publicSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
@@ -96,16 +100,16 @@ Resources:
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub ${AWS::StackName}-PublicSubnet1 
+          Value: !Sub ${AWS::StackName}-PublicSubnet1
 
-  #Public Subnet 1 attached to Public Route Table:
+  #Attaching the public subnets-1 to the Public Route Table:
   RouteTablePublicSubnet1Association:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId: !Ref PublicRouteTable
       SubnetId: !Ref publicSubnet1
 
- #Creating Public Subnet-2:
+  #creating Public Subnet-2:
   publicSubnet2:
     Type: AWS::EC2::Subnet
     Properties:
@@ -117,14 +121,14 @@ Resources:
         - Key: Name
           Value: !Sub ${AWS::StackName}-PublicSubnet2
 
-  #Public Subnet 2 attached to Public Route Table:
+  #Attaching the public subnets-2 to the Public Route Table:
   RouteTablePublicSubnet2Association:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId: !Ref PublicRouteTable
       SubnetId: !Ref publicSubnet2
 
-  #Creating Public Subnet-3:
+  #creating Public Subnet-3:
   publicSubnet3:
     Type: AWS::EC2::Subnet
     Properties:
@@ -136,66 +140,117 @@ Resources:
         - Key: Name
           Value: !Sub ${AWS::StackName}-PublicSubnet3
 
-  #Public Subnet 3 attached to Public Route Table:
+  #Attaching the public subnets-3 to the Public Route Table:
   RouteTablePublicSubnet3Association:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId: !Ref PublicRouteTable
       SubnetId: !Ref publicSubnet3
 
-  #Creating Private Subnet-1:
-  # privateSubnet1:
+  #creating Private Subnet-1:
+  # myPrivateSubnet1:
   #   Type: AWS::EC2::Subnet
   #   Properties:
   #     VpcId: !Ref VPC6225
-  #     CidrBlock: !Ref PrivateSubnet1
+  #     CidrBlock: !Ref PrivateSubnet1CIDR
   #     AvailabilityZone: !Select [0, !GetAZs ""]
   #     MapPublicIpOnLaunch: false
   #     Tags:
   #       - Key: Name
   #         Value: !Sub ${AWS::StackName}-PrivateSubnet1
 
-  # #Private Subnet 1 attached to Private Route Table:
+  #Attaching the private subnets-1 to the private Route Table:
   # PrivateSubnet1RouteTableAssociation:
   #   Type: AWS::EC2::SubnetRouteTableAssociation
   #   Properties:
   #     RouteTableId: !Ref PrivateRouteTable
-  #     SubnetId: !Ref privateSubnet1
+  #     SubnetId: !Ref myPrivateSubnet1
 
-  # #Creating Private Subnet-2:
-  # privateSubnet2:
+  #creating Private Subnet-2:
+  # myPrivateSubnet2:
   #   Type: AWS::EC2::Subnet
   #   Properties:
   #     VpcId: !Ref VPC6225
-  #     CidrBlock: !Ref PrivateSubnet2
+  #     CidrBlock: !Ref PrivateSubnet2CIDR
   #     AvailabilityZone: !Select [1, !GetAZs ""]
   #     MapPublicIpOnLaunch: false
   #     Tags:
   #       - Key: Name
   #         Value: !Sub ${AWS::StackName}-PrivateSubnet2
 
-  # #Private Subnet 2 attached to Private Route Table:
+  #Attaching the private subnets-2 to the private Route Table:
   # PrivateSubnet2RouteTableAssociation:
   #   Type: AWS::EC2::SubnetRouteTableAssociation
   #   Properties:
   #     RouteTableId: !Ref PrivateRouteTable
-  #     SubnetId: !Ref privateSubnet2
+  #     SubnetId: !Ref myPrivateSubnet2
 
-  # #Creating Private Subnet-3:
-  # privateSubnet3:
+  #creating Private Subnet-3:
+  # myPrivateSubnet3:
   #   Type: AWS::EC2::Subnet
   #   Properties:
   #     VpcId: !Ref VPC6225
-  #     CidrBlock: !Ref PrivateSubnet3
+  #     CidrBlock: !Ref PrivateSubnet3CIDR
   #     AvailabilityZone: !Select [2, !GetAZs ""]
   #     MapPublicIpOnLaunch: false
   #     Tags:
   #       - Key: Name
   #         Value: !Sub ${AWS::StackName}-PrivateSubnet3
 
-  # #Private Subnet 3 attached to Private Route Table:
+  #Attaching the private subnets-3 to the private Route Table:
   # PrivateSubnet3RouteTableAssociation:
   #   Type: AWS::EC2::SubnetRouteTableAssociation
   #   Properties:
   #     RouteTableId: !Ref PrivateRouteTable
-  #     SubnetId: !Ref privateSubnet3
+  #     SubnetId: !Ref myPrivateSubnet3
+
+  #EC2 Security Group
+  WebAppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VPC6225
+      GroupDescription: ec2 Security group with ports
+      GroupName: application
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          CidrIp: 0.0.0.0/0
+          FromPort: 443
+          ToPort: 443
+        - IpProtocol: tcp
+          CidrIp: 0.0.0.0/0
+          FromPort: 80
+          ToPort: 80
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-ApplicationSecurityGroup
+
+
+  #EC2 Instance
+  ec2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref ImageValue
+      # IamInstanceProfile: !Ref ec2InstanceProfile
+      DisableApiTermination: false
+      InstanceType: t2.micro
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeType: gp2
+            VolumeSize: 50
+      NetworkInterfaces:
+        - SubnetId: !Ref publicSubnet1
+          AssociatePublicIpAddress: true
+          DeviceIndex: 0
+          GroupSet: [!Ref WebAppSecurityGroup]
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-Instance
