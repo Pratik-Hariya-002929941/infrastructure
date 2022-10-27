@@ -23,18 +23,82 @@ Parameters:
     Default: ""
     Type: String
     Description: Please Enter the image id
-  # PrivateSubnet1CIDR:
-  #   Default: "10.0.4.0/24"
-  #   Type: String
-  #   Description: Please Enter the IP Address Range for Private Subnet-1
-  # PrivateSubnet2CIDR:
-  #   Default: "10.0.5.0/24"
-  #   Type: String
-  #   Description: Please Enter the IP Address Range for Private Subnet-2
-  # PrivateSubnet3CIDR:
-  #   Default: "10.0.6.0/24"
-  #   Type: String
-  #   Description: Please Enter the IP Address Range for Private Subnet-3
+  PrivateSubnet1:
+    Default: "10.0.4.0/24"
+    Type: String
+    Description: Please Enter the IP Address Range for Private Subnet-1
+  PrivateSubnet2:
+    Default: "10.0.5.0/24"
+    Type: String
+    Description: Please Enter the IP Address Range for Private Subnet-2
+  PrivateSubnet3:
+    Default: "10.0.6.0/24"
+    Type: String
+    Description: Please Enter the IP Address Range for Private Subnet-3
+  Bucketname:
+    Description: domain Name for S3 Bucket Naming
+    Type: String
+    Default: "hariyapratiks3bucket"
+  DbInstanceClass:
+    Default: "db.t3.micro"
+    Type: String
+  # MultiAZDatabase:
+  #   AllowedValues:
+  #     - true
+  #     - false
+  DbInstanceIdentifier:
+    AllowedPattern: "[a-zA-Z][a-zA-Z0-9]*"
+    ConstraintDescription: Must begin with a letter and contain only alphanumeric characters
+    Default: csye6225
+    Description: Instance identifier name
+    MaxLength: 60
+    MinLength: 1
+    Type: String
+  DbUser:
+    AllowedPattern: "[a-zA-Z][a-zA-Z0-9]*"
+    ConstraintDescription: Must begin with a letter and contain only alphanumeric characters
+    Default: csye6225
+    Description: Username for MySQL database access
+    MaxLength: 16
+    MinLength: 1
+    NoEcho: true
+    Type: String
+  DbPassword:
+    AllowedPattern: "[a-zA-Z0-9]*"
+    ConstraintDescription: Must contain only alphanumeric characters
+    Default: csye6225
+    Description: Password for MySQL database access
+    MaxLength: 41
+    MinLength: 8
+    NoEcho: true
+    Type: String
+  DbName:
+    AllowedPattern: "[a-zA-Z][a-zA-Z0-9]*"
+    ConstraintDescription: Must begin with a letter and contain only alphanumeric characters
+    Default: csye6225
+    Description: MySql database name
+    MaxLength: 64
+    MinLength: 1
+    Type: String
+  DbAllocatedStorage:
+    ConstraintDescription: Must be between 5 and 1024Gb
+    Default: 20
+    Description: The size of the database (Gb)
+    MaxValue: 65536
+    MinValue: 5
+    Type: Number
+  AwsAccessKey:
+    Default: ""
+    Type: String
+    Description: Please Enter the Secret key
+  AwsSecretKey:
+    Default: ""
+    Type: String
+    Description: Please Enter the Access key
+  S3BucketRegion:
+    Default: "us-east-1"
+    Type: String
+    Description: Please Enter the Access key
 
 Resources:
   # Creating VPC
@@ -73,14 +137,14 @@ Resources:
           Value: !Sub ${AWS::StackName}-PublicRouteTable
       VpcId: !Ref VPC6225
 
-  #creating A Private Route Table:
-  # PrivateRouteTable:
-  #   Type: AWS::EC2::RouteTable
-  #   Properties:
-  #     Tags:
-  #       - Key: Name
-  #         Value: Private Route Table
-  #     VpcId: !Ref VPC6225
+  # creating A Private Route Table:
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: Private Route Table
+      VpcId: !Ref VPC6225
 
   #creating a public route for public route table with destination CIDR block 0.0.0.0/0 and Above created IGW as target:
   PublicRoute:
@@ -148,61 +212,61 @@ Resources:
       SubnetId: !Ref publicSubnet3
 
   #creating Private Subnet-1:
-  # myPrivateSubnet1:
-  #   Type: AWS::EC2::Subnet
-  #   Properties:
-  #     VpcId: !Ref VPC6225
-  #     CidrBlock: !Ref PrivateSubnet1CIDR
-  #     AvailabilityZone: !Select [0, !GetAZs ""]
-  #     MapPublicIpOnLaunch: false
-  #     Tags:
-  #       - Key: Name
-  #         Value: !Sub ${AWS::StackName}-PrivateSubnet1
+  privateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC6225
+      CidrBlock: !Ref PrivateSubnet1
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-PrivateSubnet1
 
   #Attaching the private subnets-1 to the private Route Table:
-  # PrivateSubnet1RouteTableAssociation:
-  #   Type: AWS::EC2::SubnetRouteTableAssociation
-  #   Properties:
-  #     RouteTableId: !Ref PrivateRouteTable
-  #     SubnetId: !Ref myPrivateSubnet1
+  RouteTablePrivateSubnet1Association:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref privateSubnet1
 
   #creating Private Subnet-2:
-  # myPrivateSubnet2:
-  #   Type: AWS::EC2::Subnet
-  #   Properties:
-  #     VpcId: !Ref VPC6225
-  #     CidrBlock: !Ref PrivateSubnet2CIDR
-  #     AvailabilityZone: !Select [1, !GetAZs ""]
-  #     MapPublicIpOnLaunch: false
-  #     Tags:
-  #       - Key: Name
-  #         Value: !Sub ${AWS::StackName}-PrivateSubnet2
+  privateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC6225
+      CidrBlock: !Ref PrivateSubnet2
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-PrivateSubnet2
 
   #Attaching the private subnets-2 to the private Route Table:
-  # PrivateSubnet2RouteTableAssociation:
-  #   Type: AWS::EC2::SubnetRouteTableAssociation
-  #   Properties:
-  #     RouteTableId: !Ref PrivateRouteTable
-  #     SubnetId: !Ref myPrivateSubnet2
+  RouteTablePrivateSubnet2Association:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref privateSubnet2
 
   #creating Private Subnet-3:
-  # myPrivateSubnet3:
-  #   Type: AWS::EC2::Subnet
-  #   Properties:
-  #     VpcId: !Ref VPC6225
-  #     CidrBlock: !Ref PrivateSubnet3CIDR
-  #     AvailabilityZone: !Select [2, !GetAZs ""]
-  #     MapPublicIpOnLaunch: false
-  #     Tags:
-  #       - Key: Name
-  #         Value: !Sub ${AWS::StackName}-PrivateSubnet3
+  privateSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC6225
+      CidrBlock: !Ref PrivateSubnet3
+      AvailabilityZone: !Select [2, !GetAZs ""]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-PrivateSubnet3
 
   #Attaching the private subnets-3 to the private Route Table:
-  # PrivateSubnet3RouteTableAssociation:
-  #   Type: AWS::EC2::SubnetRouteTableAssociation
-  #   Properties:
-  #     RouteTableId: !Ref PrivateRouteTable
-  #     SubnetId: !Ref myPrivateSubnet3
+  RouteTablePrivateSubnet3Association:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref privateSubnet3
 
   #EC2 Security Group
   WebAppSecurityGroup:
@@ -232,13 +296,173 @@ Resources:
         - Key: Name
           Value: !Sub ${AWS::StackName}-ApplicationSecurityGroup
 
+  #creating the security group for RDS:
+  DataBaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VPC6225
+      GroupDescription: RDS Security group with ports
+      GroupName: database
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref WebAppSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-DataBaseSecurityGroup
+
+  #creating s3 bucket:
+  S3Bucket:
+    Type: "AWS::S3::Bucket"
+    Description: Creating Amazon S3 bucket from CloudFormation
+    DeletionPolicy: Delete
+    Properties:
+      BucketName:
+        !Join [
+          ".",
+          [
+            !Select [0, !Split [-, !Select [2, !Split [/, !Ref AWS::StackId]]]],
+            !Ref Bucketname,
+          ],
+        ]
+      AccessControl: Private
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: Rule for log prefix
+            Prefix: logs
+            Status: Enabled
+            Transitions:
+              - TransitionInDays: 30
+                StorageClass: STANDARD_IA
+              - TransitionInDays: 90
+                StorageClass: GLACIER
+            ExpirationInDays: 365
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - "*"
+            AllowedMethods:
+              - GET
+              - PUT
+              - POST
+              - DELETE
+            AllowedOrigins:
+              - "*"
+            MaxAge: "3600"
+
+
+  #custom parameter group for RDS
+  MyRDSParamGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Family: mysql8.0
+      Description: Custom Database Parameter Group
+
+  # Creating Database Subnet Group
+  DatabaseSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet group for RDS database
+      SubnetIds:
+        - !Ref privateSubnet1
+        - !Ref privateSubnet2
+      Tags:
+        - Key: Name
+          Value: database subnets
+
+  # Creating RDS instance
+  DatabaseInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      AllocatedStorage: !Ref DbAllocatedStorage
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      # BackupRetentionPeriod: !Ref DatabaseBackupRetentionPeriod
+      DBInstanceClass: !Ref DbInstanceClass
+      DBInstanceIdentifier: !Ref DbInstanceIdentifier
+      DBName: !Ref DbName
+      DBSubnetGroupName: !Ref DatabaseSubnetGroup
+      Engine: mysql
+      EngineVersion: 8.0
+      StorageEncrypted: true
+      MasterUsername: !Ref DbUser
+      MasterUserPassword: !Ref DbPassword
+      MultiAZ: false
+      PubliclyAccessible: false
+      DBParameterGroupName: !Ref MyRDSParamGroup
+      VPCSecurityGroups:
+        - !Ref DataBaseSecurityGroup
+
+  #creating s3 policy:
+  WebAppS3:
+    Type: "AWS::IAM::ManagedPolicy"
+    DependsOn: S3Bucket
+    Properties:
+      ManagedPolicyName: WebAppS3
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: AllowGetPutDeleteActionsOnS3Bucket
+            Effect: Allow
+            Action:
+              - "s3:PutObject"
+              - "s3:GetObject"
+              - "s3:DeleteObject"
+              - "s3:PostObject"
+            Resource:
+              - "Fn::Join":
+                  - ""
+                  - - "arn:aws:s3:::"
+                    - Ref: S3Bucket
+                    - /*
+              - "Fn::Join":
+                  - ""
+                  - - "arn:aws:s3:::"
+                    - Ref: S3Bucket
+
+  #creating IAM roles:
+  EC2CSYE6225:
+    Type: AWS::IAM::Role
+    DependsOn: WebAppS3
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      Path: /
+      RoleName: EC2-CSYE6225
+      ManagedPolicyArns:
+        - !Ref WebAppS3
+
+  #creating a instance profile:
+  ec2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: ec2-instance-profile
+      Path: /
+      Roles:
+        - !Ref EC2CSYE6225
 
   #EC2 Instance
   ec2Instance:
     Type: AWS::EC2::Instance
     Properties:
       ImageId: !Ref ImageValue
-      # IamInstanceProfile: !Ref ec2InstanceProfile
+      IamInstanceProfile: !Ref ec2InstanceProfile
       DisableApiTermination: false
       InstanceType: t2.micro
       BlockDeviceMappings:
@@ -254,3 +478,29 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub ${AWS::StackName}-Instance
+      UserData:
+        Fn::Base64: !Sub |
+          #! /bin/bash
+          sudo chmod R 777 /etc/environment
+          sudo touch /usr/share/tomcat9/bin/setenv.sh
+          sudo chmod -R 777 /usr/share/tomcat9/bin/setenv.sh
+          sudo echo 'export AWS_DATABASE=${DatabaseInstance.Endpoint.Address}' >> /usr/share/tomcat9/bin/setenv.sh
+          sudo echo 'export DB_USER=${DbUser}' >> /usr/share/tomcat9/bin/setenv.sh
+          sudo echo 'export PASSWORD=${DbPassword}' >> /usr/share/tomcat9/bin/setenv.sh
+          sudo echo 'export AWS_SBUCKET=${S3Bucket}' >> /usr/share/tomcat9/bin/setenv.sh
+          sudo echo 'export DB_NAME=${DbName}' >> /usr/share/tomcat9/bin/setenv.sh
+          sudo echo 'export AWS_ACCESS_KEY_ID=${AwsAccessKey}' >> /usr/share/tomcat9/bin/setenv.sh
+          sudo echo 'export AWS_SECRET_KEY_ID=${AwsSecretKey}' >> /usr/share/tomcat9/bin/setenv.sh
+          sudo echo 'export AWS_REGION=${S3BucketRegion}' >> /usr/share/tomcat9/bin/setenv.sh
+          sudo systemctl restart tomcat9.service
+          
+          
+          # sudo echo 'AWS_DATABASE=${DatabaseInstance.Endpoint.Address}' >> /etc/environment
+          # sudo echo 'DB_USER=${DbUser}' >> /etc/environment
+          # sudo echo 'PASSWORD=${DbPassword}' >> /etc/environment
+          # sudo echo 'AWS_SBUCKET=${S3Bucket}' >> /etc/environment
+          # sudo echo 'DB_NAME=${DbName}' >> /etc/environment
+          # sudo echo 'AWS_ACCESS_KEY_ID=${AwsAccessKey}' >> /etc/environment
+          # sudo echo 'AWS_SECRET_KEY_ID=${AwsSecretKey}' >> /etc/environment
+          # sudo echo 'AWS_REGION=${S3BucketRegion}' >> /etc/environment
+          sleep 50
