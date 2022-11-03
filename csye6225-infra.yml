@@ -42,10 +42,6 @@ Parameters:
   DbInstanceClass:
     Default: "db.t3.micro"
     Type: String
-  # MultiAZDatabase:
-  #   AllowedValues:
-  #     - true
-  #     - false
   DbInstanceIdentifier:
     AllowedPattern: "[a-zA-Z][a-zA-Z0-9]*"
     ConstraintDescription: Must begin with a letter and contain only alphanumeric characters
@@ -102,11 +98,11 @@ Parameters:
   DomainName:
     Description: domain Name for S3 Bucket Naming
     Type: String
-    Default: "dev.pratikhariya.me"
-    hostedZoneID:
-      Description: Hosted Zone Id of your domain
-      Type: String
-      Default: "Z01416121ACO3GH253Q1F"
+    Default: "demo.pratikhariya.me"
+  hostedZoneID:
+    Description: Hosted Zone Id of your domain
+    Type: String
+    Default: "Z01410161O896AQVOBFBY"
 
 Resources:
   # Creating VPC
@@ -501,16 +497,7 @@ Resources:
           sudo echo 'export AWS_SECRET_KEY_ID=${AwsSecretKey}' >> /usr/share/tomcat9/bin/setenv.sh
           sudo echo 'export AWS_REGION=${S3BucketRegion}' >> /usr/share/tomcat9/bin/setenv.sh
           sudo systemctl restart tomcat9.service
-          
-          
-          # sudo echo 'AWS_DATABASE=${DatabaseInstance.Endpoint.Address}' >> /etc/environment
-          # sudo echo 'DB_USER=${DbUser}' >> /etc/environment
-          # sudo echo 'PASSWORD=${DbPassword}' >> /etc/environment
-          # sudo echo 'AWS_SBUCKET=${S3Bucket}' >> /etc/environment
-          # sudo echo 'DB_NAME=${DbName}' >> /etc/environment
-          # sudo echo 'AWS_ACCESS_KEY_ID=${AwsAccessKey}' >> /etc/environment
-          # sudo echo 'AWS_SECRET_KEY_ID=${AwsSecretKey}' >> /etc/environment
-          # sudo echo 'AWS_REGION=${S3BucketRegion}' >> /etc/environment
+          sudo iptables -A PREROUTING -t nat -p tcp --dport 80 -j REDIRECT --to-ports 8080
           sleep 50
 
   # Creating record for domain name
