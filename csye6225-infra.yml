@@ -103,6 +103,10 @@ Parameters:
     Description: Hosted Zone Id of your domain
     Type: String
     Default: "Z01410161O896AQVOBFBY"
+  DynamoDB:
+    Description: dynamoDb creation
+    Type: String
+    Default: ""
 
 Resources:
   # Creating VPC
@@ -460,6 +464,174 @@ Resources:
       Path: /
       Roles:
         - !Ref EC2CSYE6225
+
+  #creating dynamoDB:
+  dynamoDBExisting:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: "Email"
+          AttributeType: S
+        - AttributeName: "Token"
+          AttributeType: S
+      BillingMode: "PROVISIONED"
+      KeySchema:
+        - AttributeName: "Email"
+          KeyType: "RANGE"
+        - AttributeName: "Token"
+          KeyType: "HASH"
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      TableName: CSYE6225DynamoDB
+      Tags:
+        - Key: Name
+          Value: !Ref AWS::StackName
+      TimeToLiveSpecification:
+        AttributeName: "Expiry"
+        Enabled: true
+
+  #creating sns topic:
+  topicId:
+    Type: "AWS::SNS::Topic"
+    DependsOn: lambdaFunction
+    Properties:
+      Subscription:
+        - Endpoint: !GetAtt
+            - lambdaFunction
+            - Arn
+          Protocol: lambda
+      TopicName: email
+
+  SNStopicpolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Version: '2008-10-17'
+        Id: __default_policy_ID
+        Statement:
+          - Sid: __default_statement_ID
+            Effect: Allow
+            Principal:
+              AWS: "*"
+            Action:
+              - SNS:Publish
+              - SNS:DeleteTopic
+              - SNS:ListSubscriptionsByTopic
+              - SNS:GetTopicAttributes
+              - SNS:Receive
+              - SNS:AddPermission
+              - SNS:Subscribe
+            Resource:
+              Ref: topicId
+            Condition:
+              StringEquals:
+                AWS:SourceOwner: !Ref AWS::AccountId
+          - Sid: __console_pub_0
+            Effect: Allow
+            Principal:
+              AWS: "*"
+            Action: SNS:Publish
+            Resource:
+              Ref: topicId
+          - Sid: __console_sub_0
+            Effect: Allow
+            Principal:
+              AWS: "*"
+            Action:
+              - SNS:Subscribe
+              - SNS:Receive
+            Resource:
+              Ref: topicId
+      Topics:
+        - Ref: topicId
+
+  #creating Lambda Policy:
+  lambdaPolicy:
+    Type: "AWS::IAM::ManagedPolicy"
+    DependsOn: topicId
+    Properties:
+      ManagedPolicyName: lambdaPolicy
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: LambdaDynamoDBAccess
+            Effect: Allow
+            Action:
+              - "dynamodb:GetItem"
+              - "dynamodb:PutItem"
+              - "dynamodb:UpdateItem"
+              - "dynamodb:Scan"
+            Resource:
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/ExistingEmailTable"
+          - Sid: LambdaSESAccess
+            Effect: Allow
+            Action:
+              - "ses:VerifyEmailAddress"
+              - "ses:SendEmail"
+              - "ses:SendRawEmail"
+            Resource: "*"
+            # Resource: !Sub "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/*"
+          - Sid: LambdaS3Access
+            Effect: Allow
+            Action:
+              - "s3:GetObject"
+            Resource: !Sub "arn:aws:s3:::serverless.${DomainName}/*"
+          - Sid: LambdaSNSAccess
+            Effect: Allow
+            Action:
+              - "sns:ConfirmSubscription"
+            Resource: !Ref topicId
+      Roles:
+        - !Ref lambdaExecutionRole
+
+  #creating role for Lambda:
+  lambdaExecutionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: "sts:AssumeRole"
+      Path: /
+      RoleName: LambdaExecutionRole
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-LambdaExecutionRoleId"
+
+  #creating lambda Function:
+  lambdaFunction:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      FunctionName: lambda_triggred_by_sns
+      Code:
+        S3Bucket: !Sub "serverless.${DomainName}"
+        S3Key: csye6225lambda-1.jar
+      Handler: "com.neu.serverless.Handler"
+      Role: !GetAtt
+        - lambdaExecutionRole
+        - Arn
+      Runtime: java11
+      MemorySize: 256
+      Timeout: 180
+      # ReservedConcurrentExecutions: 5
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-Email"
+
+  #creating permission for lambda:
+  lambdaPermission:
+    Type: "AWS::Lambda::Permission"
+    DependsOn: lambdaFunction
+    Properties:
+      FunctionName: !Ref lambdaFunction
+      Action: "lambda:InvokeFunction"
+      Principal: sns.amazonaws.com
+      SourceArn: !Ref topicId
 
   #EC2 Instance
   ec2Instance:
