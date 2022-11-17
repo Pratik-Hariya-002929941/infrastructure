@@ -526,6 +526,7 @@ Resources:
           sudo systemctl daemon-reload
           sudo systemctl enable iptable.service
           sudo systemctl start iptable.service
+          sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/amazon-cloudwatch-agent.json -s
           sleep 50
 
   # Creating record for domain name
