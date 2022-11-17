@@ -455,6 +455,9 @@ Resources:
       RoleName: EC2-CSYE6225
       ManagedPolicyArns:
         - !Ref WebAppS3
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+        - !Ref DynamoDBPolicy
+        - !Ref topicPolicy
 
   #creating a instance profile:
   ec2InstanceProfile:
@@ -465,31 +468,76 @@ Resources:
       Roles:
         - !Ref EC2CSYE6225
 
-  #creating dynamoDB:
-  dynamoDBExisting:
-    Type: AWS::DynamoDB::Table
+  #EC2 Instance
+  ec2Instance:
+    Type: AWS::EC2::Instance
     Properties:
-      AttributeDefinitions:
-        - AttributeName: "Email"
-          AttributeType: S
-        - AttributeName: "Token"
-          AttributeType: S
-      BillingMode: "PROVISIONED"
-      KeySchema:
-        - AttributeName: "Email"
-          KeyType: "RANGE"
-        - AttributeName: "Token"
-          KeyType: "HASH"
-      ProvisionedThroughput:
-        ReadCapacityUnits: 1
-        WriteCapacityUnits: 1
-      TableName: CSYE6225DynamoDB
+      ImageId: !Ref ImageValue
+      IamInstanceProfile: !Ref ec2InstanceProfile
+      DisableApiTermination: false
+      InstanceType: t2.micro
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeType: gp2
+            VolumeSize: 50
+      NetworkInterfaces:
+        - SubnetId: !Ref publicSubnet1
+          AssociatePublicIpAddress: true
+          DeviceIndex: 0
+          GroupSet: [!Ref WebAppSecurityGroup]
       Tags:
         - Key: Name
-          Value: !Ref AWS::StackName
-      TimeToLiveSpecification:
-        AttributeName: "Expiry"
-        Enabled: true
+          Value: !Sub ${AWS::StackName}-Instance
+      UserData:
+        Fn::Base64: !Sub |
+          #! /bin/bash
+          sudo chmod R 777 /etc/environment
+          sudo touch /usr/share/tomcat9/bin/setenv.sh
+          sudo chmod -R 777 /usr/share/tomcat9/bin/setenv.sh
+          sudo echo 'export AWS_DATABASE=${DatabaseInstance.Endpoint.Address}' >> /usr/share/tomcat9/bin/setenv.sh
+          sudo echo 'export DB_USER=${DbUser}' >> /usr/share/tomcat9/bin/setenv.sh
+          sudo echo 'export PASSWORD=${DbPassword}' >> /usr/share/tomcat9/bin/setenv.sh
+          sudo echo 'export AWS_SBUCKET=${S3Bucket}' >> /usr/share/tomcat9/bin/setenv.sh
+          sudo echo 'export DB_NAME=${DbName}' >> /usr/share/tomcat9/bin/setenv.sh
+          sudo echo 'export AWS_ACCESS_KEY_ID=${AwsAccessKey}' >> /usr/share/tomcat9/bin/setenv.sh
+          sudo echo 'export AWS_SECRET_KEY_ID=${AwsSecretKey}' >> /usr/share/tomcat9/bin/setenv.sh
+          sudo echo 'export AWS_REGION=${S3BucketRegion}' >> /usr/share/tomcat9/bin/setenv.sh
+          sudo echo 'export EMAIL_TOPIC_ARN=arn:aws:sns:${AWS::Region}:${AWS::AccountId}:email' >> /usr/share/tomcat9/bin/setenv.sh
+          sudo echo 'export DOMAIN_NAME=${DomainName}' >> /usr/share/tomcat9/bin/setenv.sh
+          sudo systemctl restart tomcat9.service
+          sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/amazon-cloudwatch-agent.json -s
+          sudo iptables -A PREROUTING -t nat -p tcp --dport 80 -j REDIRECT --to-ports 8080
+          sudo touch /etc/systemd/system/iptable.service
+          sudo chmod -R 755 /etc/systemd/system/iptable.service
+          sudo cat << EOF > /etc/systemd/system/iptable.service
+          [Unit]
+          Description=Iptables Setup
+          
+          [Service]
+          Restart=always
+          RestartSec=30
+          ExecStart= /bin/bash -c 'sudo iptables -A PREROUTING -t nat -p tcp --dport 80 -j REDIRECT --to-ports 8080'
+          User=root
+          
+          [Install]
+          WantedBy=multi-user.target 
+          EOF
+          sudo systemctl daemon-reload
+          sudo systemctl enable iptable.service
+          sudo systemctl start iptable.service
+          sleep 50
+
+  # Creating record for domain name
+  DnsRecordSet:
+    Type: "AWS::Route53::RecordSet"
+    Properties:
+      Name: !Ref DomainName
+      Type: A
+      TTL: 60
+      HostedZoneId: !Ref hostedZoneID
+      ResourceRecords:
+        - !GetAtt ec2Instance.PublicIp
 
   #creating sns topic:
   topicId:
@@ -503,48 +551,58 @@ Resources:
           Protocol: lambda
       TopicName: email
 
-  SNStopicpolicy:
-    Type: AWS::SNS::TopicPolicy
+  DynamoDBPolicy:
+    Type: "AWS::IAM::ManagedPolicy"
     Properties:
+      ManagedPolicyName: DynamoDBPolicy
+      Path: /
       PolicyDocument:
-        Version: '2008-10-17'
-        Id: __default_policy_ID
+        Version: 2012-10-17
         Statement:
-          - Sid: __default_statement_ID
-            Effect: Allow
-            Principal:
-              AWS: "*"
+          - Effect: Allow
             Action:
-              - SNS:Publish
-              - SNS:DeleteTopic
-              - SNS:ListSubscriptionsByTopic
-              - SNS:GetTopicAttributes
-              - SNS:Receive
-              - SNS:AddPermission
-              - SNS:Subscribe
+              - dynamodb:DescribeTable
+              - dynamodb:GetItem
+              - dynamodb:Query
+              - dynamodb:Scan
+              - dynamodb:CreateTable
+              - dynamodb:DeleteItem
+              - dynamodb:UpdateItem
+              - dynamodb:UpdateTable
+              - dynamodb:PutItem
+              - dynamodb:DescribeStream
+              - dynamodb:List*
+              - dynamodb:DescribeReservedCapacity*
+              - dynamodb:DescribeLimits
+              - dynamodb:DescribeTimeToLive
             Resource:
-              Ref: topicId
-            Condition:
-              StringEquals:
-                AWS:SourceOwner: !Ref AWS::AccountId
-          - Sid: __console_pub_0
-            Effect: Allow
-            Principal:
-              AWS: "*"
-            Action: SNS:Publish
-            Resource:
-              Ref: topicId
-          - Sid: __console_sub_0
-            Effect: Allow
-            Principal:
-              AWS: "*"
-            Action:
-              - SNS:Subscribe
-              - SNS:Receive
-            Resource:
-              Ref: topicId
-      Topics:
-        - Ref: topicId
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/OneTimeTokenTable"
+
+  #creating dynamoDB:
+  dynamoDBExisting:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: "Email"
+          AttributeType: S
+        - AttributeName: "Token"
+          AttributeType: S
+      BillingMode: "PROVISIONED"
+      KeySchema:
+        - AttributeName: "Email"
+          KeyType: "HASH"
+        - AttributeName: "Token"
+          KeyType: "RANGE"
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      TableName: OneTimeTokenTable
+      Tags:
+        - Key: Name
+          Value: !Ref AWS::StackName
+      TimeToLiveSpecification:
+        AttributeName: "Expiry"
+        Enabled: true
 
   #creating Lambda Policy:
   lambdaPolicy:
@@ -612,6 +670,10 @@ Resources:
         S3Bucket: !Sub "serverless.${DomainName}"
         S3Key: csye6225lambda-1.jar
       Handler: "com.neu.serverless.Handler"
+      Environment:
+        Variables:
+          domain: !Ref DomainName
+          table: !Ref dynamoDBExisting
       Role: !GetAtt
         - lambdaExecutionRole
         - Arn
@@ -633,70 +695,18 @@ Resources:
       Principal: sns.amazonaws.com
       SourceArn: !Ref topicId
 
-  #EC2 Instance
-  ec2Instance:
-    Type: AWS::EC2::Instance
+  #creating topic policy:
+  topicPolicy:
+    Type: "AWS::IAM::ManagedPolicy"
+    DependsOn: topicId
     Properties:
-      ImageId: !Ref ImageValue
-      IamInstanceProfile: !Ref ec2InstanceProfile
-      DisableApiTermination: false
-      InstanceType: t2.micro
-      BlockDeviceMappings:
-        - DeviceName: /dev/xvda
-          Ebs:
-            VolumeType: gp2
-            VolumeSize: 50
-      NetworkInterfaces:
-        - SubnetId: !Ref publicSubnet1
-          AssociatePublicIpAddress: true
-          DeviceIndex: 0
-          GroupSet: [!Ref WebAppSecurityGroup]
-      Tags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName}-Instance
-      UserData:
-        Fn::Base64: !Sub |
-          #! /bin/bash
-          sudo chmod R 777 /etc/environment
-          sudo touch /usr/share/tomcat9/bin/setenv.sh
-          sudo chmod -R 777 /usr/share/tomcat9/bin/setenv.sh
-          sudo echo 'export AWS_DATABASE=${DatabaseInstance.Endpoint.Address}' >> /usr/share/tomcat9/bin/setenv.sh
-          sudo echo 'export DB_USER=${DbUser}' >> /usr/share/tomcat9/bin/setenv.sh
-          sudo echo 'export PASSWORD=${DbPassword}' >> /usr/share/tomcat9/bin/setenv.sh
-          sudo echo 'export AWS_SBUCKET=${S3Bucket}' >> /usr/share/tomcat9/bin/setenv.sh
-          sudo echo 'export DB_NAME=${DbName}' >> /usr/share/tomcat9/bin/setenv.sh
-          sudo echo 'export AWS_ACCESS_KEY_ID=${AwsAccessKey}' >> /usr/share/tomcat9/bin/setenv.sh
-          sudo echo 'export AWS_SECRET_KEY_ID=${AwsSecretKey}' >> /usr/share/tomcat9/bin/setenv.sh
-          sudo echo 'export AWS_REGION=${S3BucketRegion}' >> /usr/share/tomcat9/bin/setenv.sh
-          sudo systemctl restart tomcat9.service
-          sudo iptables -A PREROUTING -t nat -p tcp --dport 80 -j REDIRECT --to-ports 8080
-          sudo touch /etc/systemd/system/iptable.service
-          sudo chmod -R 755 /etc/systemd/system/iptable.service
-          sudo cat << EOF > /etc/systemd/system/iptable.service
-          [Unit]
-          Description=Iptables Setup
-          
-          [Service]
-          Restart=always
-          RestartSec=30
-          ExecStart= /bin/bash -c 'sudo iptables -A PREROUTING -t nat -p tcp --dport 80 -j REDIRECT --to-ports 8080'
-          User=root
-          
-          [Install]
-          WantedBy=multi-user.target 
-          EOF
-          sudo systemctl daemon-reload
-          sudo systemctl enable iptable.service
-          sudo systemctl start iptable.service
-          sleep 50
-
-  # Creating record for domain name
-  DnsRecordSet:
-    Type: "AWS::Route53::RecordSet"
-    Properties:
-      Name: !Ref DomainName
-      Type: A
-      TTL: 60
-      HostedZoneId: !Ref hostedZoneID
-      ResourceRecords:
-        - !GetAtt ec2Instance.PublicIp
+      ManagedPolicyName: EC2TopicAccessPolicy
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: AllowEC2ToPublishToSNSTopic
+            Effect: Allow
+            Action:
+              - "sns:Publish"
+              - "sns:CreateTopic"
+            Resource: !Ref topicId
